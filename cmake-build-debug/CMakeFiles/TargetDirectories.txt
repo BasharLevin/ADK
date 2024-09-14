@@ -1,3 +1,0 @@
-/Users/bashar/Desktop/p1/algoritmer/cmake-build-debug/CMakeFiles/algoritmer.dir
-/Users/bashar/Desktop/p1/algoritmer/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/bashar/Desktop/p1/algoritmer/cmake-build-debug/CMakeFiles/rebuild_cache.dir
