@@ -3,7 +3,6 @@
 #include <vector>
 #include <sstream>
 #include <set>
-#include <iomanip>
 #include "tokenizer.c"
 
 
@@ -62,69 +61,57 @@ void create_index(std::vector<int> &indices, std::ifstream &file) {
 std::vector<int> find_word_positions(const std::vector<int> &indices, std::ifstream &index_file, const std::string &word) {
     std::vector<int> matches;
 
+    // Get the prefix (first 3 characters) of the word
     std::string prefix = word.substr(0, std::min(word.size(), size_t(3)));
-    int hash_val = hash_prefix(prefix);
 
-    std::streampos start = indices[hash_val];
+    // Hash the prefix to get the range from indices
+    long long start = indices[hash_prefix(prefix)];
+    long long end = indices[hash_prefix(prefix) + 1];
 
-    std::streampos end = -1;
-    if (hash_val + 1 < indices.size() && indices[hash_val + 1] != -1) {
-        end = indices[hash_val + 1];
-    }
-
-    if (end == -1 || end <= start) {
-        index_file.seekg(0, std::ios::end);
-        end = index_file.tellg();
-    }
-
+    // If there's no valid range for this prefix, return empty matches
     if (start == -1) {
         std::cout << "No valid range for the prefix: " << prefix << std::endl;
         return matches;
     }
 
-    std::cout << "Searching for word: " << word << " with prefix: " << prefix << " in range [" << start << ", " << end << "]" << std::endl;
-
+    // Perform binary search while the range is large (>1000)
+    long long mid;
     std::string line;
     while (end - start > 1000) {
-        std::streampos mid = (start + end) / 2;
+        mid = (start + end) / 2;
         index_file.seekg(mid);
+        getline(index_file, line);  // Move to the next full line
+        index_file >> line;         // Extract the word
 
-        std::getline(index_file, line);
-
-        if (!std::getline(index_file, line)) {
-            break;
-        }
-
-        std::string mid_word = line.substr(0, line.find(' '));
-
-        if (mid_word == word) {
-            break;
-        } else if (mid_word < word) {
-            start = mid;
+        // Adjust the search range based on comparison with the target word
+        if (line < word) {
+            start = mid;  // Narrow to the upper half
         } else {
-            end = mid;
+            end = mid;    // Narrow to the lower half
         }
     }
 
-    int max_results = 100;
-    index_file.seekg(start);
-    while (std::getline(index_file, line) && index_file.tellg() <= end) {
-        std::string line_word;
-        int position;
-        std::istringstream ss(line);
-        ss >> line_word;
+    // Narrow search: start reading lines from the current `start` position
+    index_file.seekg(start, std::ios::beg);
+    std::string line_word;
+    int position;
+    while (true) {
+        if (index_file.peek() == EOF) {
+            return matches;  // Stop if we reach the end of the file
+        }
 
-        std::cout << "Checking word in index: " << line_word << std::endl;
+        getline(index_file, line);  // Read a line
+        std::istringstream ss(line);  // Parse the line
+        ss >> line_word;  // Extract the word from the line
 
+        // If the word matches, record the position
         if (line_word == word) {
             ss >> position;
             matches.push_back(position);
+        }
 
-            if (matches.size() >= max_results) {
-                std::cout << "Reached max result limit, exiting early.\n";
-                break;
-            }
-        } else if (line_word > word) {
+        // Stop searching if the word in the file exceeds the target word
+        if (line_word > word) {
             break;
         }
     }
@@ -188,8 +175,10 @@ int main(int argc, char *argv[]) {
     create_index(index_table, index_stream);
 
     std::string search_lower = to_lowercase(search_word);
-
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     std::vector<int> result_positions = find_word_positions(index_table, index_stream, search_lower);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout<<"Time taken to search: "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()<<" s"<<std::endl;
 
     if (result_positions.empty()) {
         std::cout << "No matches found for the word: " << search_word << std::endl;

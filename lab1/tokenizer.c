@@ -45,79 +45,56 @@ static void tokenize() {
 }
 
 static void initialize() {
-   unsigned char ch;
+      unsigned char ch;
 
-   for (int i = 0; i < 256; i++)
-      u2l[i] = 0;
+      for (unsigned char &i: u2l)
+         i = 0;
 
-   for (unsigned char* s = (unsigned char *) ALPHABET; *s; s++) {
-      ch = *s + 'a' - 'A';
-      u2l[*s] = u2l[ch] = ch;
+      for (unsigned char *s = (unsigned char *) ALPHABET; *s; s++) {
+         ch = *s + 'a' - 'A';
+         u2l[*s] = u2l[ch] = ch;
+      }
+
+      // Special handling for accented characters
+      ch = 223; // German double-s
+      u2l[ch] = 's';
+
+      for (ch = 224; ch <= 227; ++ch) // a with accent (except ? and ?)
+         u2l[ch + 'A' - 'a'] = u2l[ch] = 'a';
+
+      ch = 230; // ae to ?
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'e';
+
+      ch = 231; // c with cedilla to c
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'c';
+
+      for (ch = 232; ch <= 235; ++ch) // e with accent (including ?)
+         u2l[ch + 'A' - 'a'] = u2l[ch] = 'e';
+
+      for (ch = 236; ch <= 239; ++ch) // i with accent
+         u2l[ch + 'A' - 'a'] = u2l[ch] = 'i';
+
+      ch = 240; // eth to d
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'd';
+
+      ch = 241; // n with ~ to n
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'n';
+
+      for (ch = 242; ch <= 245; ++ch) // o with accent (except ?)
+         u2l[ch + 'A' - 'a'] = u2l[ch] = 'o';
+
+      ch = 248; // o with stroke to ?
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'ö';
+
+      for (ch = 249; ch <= 252; ++ch) // u with accent
+         u2l[ch + 'A' - 'a'] = u2l[ch] = 'u';
+
+      ch = 253; // y with accent
+      u2l[ch + 'A' - 'a'] = u2l[ch] = 'y';
+      ch = 255;
+      u2l[ch] = 'y';
    }
 
-   /*
-    * Nedan f?ljer speciall?sning f?r att klara accenterade tecken
-    */
-      
-   ch = 223;         /* tyskt dubbel-s */
-   u2l[ch] = 's';
-
-   for (ch = 224; ch <= 227; ++ch) /* a med accent (utom ? och ?) */
-      u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'a';
-    
-   /* 228 ?r ? och 229 ?r ? - ingen f?r?ndring */
-   
-   ch = 230;			/* ae till ? */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = '?';
-
-   ch = 231;			/* c med cedilj till c*/
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'c';
-
-   for (ch = 232; ch <= 235; ++ch) /* e med accent (?ven ?) */
-      u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'e';
-
-   for (ch = 236; ch <= 239; ++ch) /* i med accent */
-      u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'i';
-    
-   ch = 240;			/* eth till d */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'd';
-    
-   ch = 241;			/* n med ~ till n */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'n';
-
-   for (ch = 242; ch <= 245; ++ch) /* o med accent (f?rutom ?) */
-      u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'o';
-
-   /* 246 ?r ? - ingen f?r?ndring */
-   /* 247 ?r divisionstecken - ingen rimlig bokstav */
-   
-   ch = 248;			/* o genomskuret till ? */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = '?'; 
-
-   for (ch = 249; ch <= 252; ++ch) /* u med accent */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'u';
-
-   ch = 253;  /* y med accent */
-   u2l[ch +  - 'a' + 'A'] = u2l[ch] = 'y';
-   ch = 255;
-   u2l[ch] = 'y';
-   
-   /*
-   * Kontrollutskrift
-   *
-   */
-   
-   /*
-   for (ch = 65; ch < 255; ++ch) {
-      printf ("Kod %u tecken %c lagrat %c \n",
-      (unsigned) ch, ch, u2l[ch]);
-   }
-
-   ch = 255;
-   printf ("Kod %u tecken %c lagrat %c \n",
-      (unsigned) ch, ch, u2l[ch]);
-   */
-}
 
 void _main() {
     initialize();
