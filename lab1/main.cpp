@@ -84,6 +84,7 @@ std::vector<int> find_word_positions(std::ifstream &index_file, std::ifstream &m
             break;
         }
     }
+    //
 
     // If the prefix wasn't found in the index, return empty matches
     if (start == -1) {
