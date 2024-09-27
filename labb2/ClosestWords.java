@@ -55,17 +55,41 @@ public class ClosestWords {
   
       return dp[w1len][w2len];
   }
-*/int distance(String w1, String w2) {
-  int w1len = w1.length();
-  int w2len = w2.length();
+*/
+int distance(String w1, String w2) {
+    int w1len = w1.length();
+    int w2len = w2.length();
 
-  if (w1.equals(w2))
-    return 0;
+    if (w1.equals(w2))
+      return 0;
 
-  int[]dp0 = new int [w1len + 1];
-  int[]dp1 = new int[w1len + 1];
+    int[]dp0 = new int [w1len + 1];
+    int[]dp1 = new int[w1len + 1];
 
-  
+    for (int j = 0; j <=w1len; j++){
+      dp0[j] = j;
+
+    }
+
+    for (int i = 1; i<= w2len; i++){
+      dp1[0] = i;
+
+      for(int j = 1; j<=w1len; j++){
+        int cost = (w1.charAt(j - 1) == w2.charAt(i - 1)) ? 0 : 1;
+        dp1[j] = Math.min(Math.min(dp1[j-1]+1, dp0[j] + 1), dp0[j-1] + cost);
+
+
+      }
+
+      int[] temp = dp0;
+      dp0 = dp1;
+      dp1 = temp;
+
+  }
+
+
+
+  return dp0[w1len];
 
 
 }
