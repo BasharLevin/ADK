@@ -3,6 +3,9 @@
 #include <vector>
 #include <sstream>
 #include <set>
+#include <chrono>
+#include <algorithm>
+#include <iomanip>
 #include "tokenizer.c"
 
 
@@ -28,11 +31,12 @@ unsigned int hash_prefix(const std::string &prefix) {
         value = prefix[0];
     }
 
-    return value % 27000;
+    return value ;
 }
 
 
-void create_index(std::vector<int> &indices, std::ifstream &file) {
+
+void create_index(std::ostream& index_file, std::ifstream& file) {
     std::string line;
     std::set<std::string> seen_prefixes;
     std::streampos position = 0;
@@ -43,83 +47,107 @@ void create_index(std::vector<int> &indices, std::ifstream &file) {
 
         if (seen_prefixes.find(prefix) == seen_prefixes.end()) {
             int hash_value = hash_prefix(prefix);
-            if (indices[hash_value] == -1) {
-                indices[hash_value] = position;
 
-            }
+            // Save the hash value and the position to the index file
+            index_file << hash_value << " " << position << "\n";
+
             seen_prefixes.insert(prefix);
         }
-        position += line.length() + 1;
+        position += line.length() + 1;  // Adjust position for the newline
     }
 
+    // Reset file state for potential future use
     file.clear();
     file.seekg(0);
 }
 
-
-
-std::vector<int> find_word_positions(const std::vector<int> &indices, std::ifstream &index_file, const std::string &word) {
+std::vector<int> find_word_positions(std::ifstream &index_file, std::ifstream &main_file, const std::string &word) {
     std::vector<int> matches;
 
     // Get the prefix (first 3 characters) of the word
     std::string prefix = word.substr(0, std::min(word.size(), size_t(3)));
+    int hash_value = hash_prefix(prefix);  // Assuming hash_prefix is defined and works correctly
 
-    // Hash the prefix to get the range from indices
-    long long start = indices[hash_prefix(prefix)];
-    long long end = indices[hash_prefix(prefix) + 1];
+    // Search the index file for the hash value
+    std::string line;
+    long long start = -1, end = -1;
+    int index_hash;
+    long long position;
 
-    // If there's no valid range for this prefix, return empty matches
+    // Find the starting position for the word prefix in the index file
+    while (std::getline(index_file, line)) {
+        std::istringstream ss(line);
+        ss >> index_hash >> position;
+
+        if (index_hash == hash_value) {
+            start = position;
+            break;
+        }
+    }
+
+    // If the prefix wasn't found in the index, return empty matches
     if (start == -1) {
         std::cout << "No valid range for the prefix: " << prefix << std::endl;
         return matches;
     }
 
-    // Perform binary search while the range is large (>1000)
-    long long mid;
-    std::string line;
-    while (end - start > 1000) {
-        mid = (start + end) / 2;
-        index_file.seekg(mid);
-        getline(index_file, line);  // Move to the next full line
-        index_file >> line;         // Extract the word
+    // Get the end position (find the next prefix or the end of the index)
+    while (std::getline(index_file, line)) {
+        std::istringstream ss(line);
+        ss >> index_hash >> position;
 
-        // Adjust the search range based on comparison with the target word
-        if (line < word) {
-            start = mid;  // Narrow to the upper half
-        } else {
-            end = mid;    // Narrow to the lower half
-        }
-    }
-
-    // Narrow search: start reading lines from the current `start` position
-    index_file.seekg(start, std::ios::beg);
-    std::string line_word;
-    int position;
-    while (true) {
-        if (index_file.peek() == EOF) {
-            return matches;  // Stop if we reach the end of the file
-        }
-
-        getline(index_file, line);  // Read a line
-        std::istringstream ss(line);  // Parse the line
-        ss >> line_word;  // Extract the word from the line
-
-        // If the word matches, record the position
-        if (line_word == word) {
-            ss >> position;
-            matches.push_back(position);
-        }
-
-        // Stop searching if the word in the file exceeds the target word
-        if (line_word > word) {
+        if (index_hash != hash_value) {
+            end = position;
             break;
         }
     }
 
+    if (end == -1) {
+        main_file.seekg(0, std::ios::end);
+        end = main_file.tellg();  // If no end found, assume end of the file
+    }
+
+    // Binary search within the range [start, end]
+    long long mid;
+    std::string line_word;
+    while (end - start > 1000) {  // Narrow the search with binary search
+        mid = (start + end) / 2;
+
+        main_file.seekg(mid, std::ios::beg);
+
+        // Move to the start of the next full line (since mid might be in the middle of a line)
+        std::getline(main_file, line);
+        std::getline(main_file, line);  // Read a full line after correcting the position
+
+        std::istringstream ss(line);
+        ss >> line_word >> position;
+
+        if (line_word < word) {
+            start = mid;  // Search in the right half
+        } else {
+            end = mid;  // Search in the left half
+        }
+    }
+
+    // Now scan line by line in the narrow range
+    main_file.seekg(start, std::ios::beg);
+    while (std::getline(main_file, line)) {
+        std::istringstream ss(line);
+        ss >> line_word >> position;
+
+        if (line_word == word) {
+            matches.push_back(position);
+        }
+
+        if (line_word > word) {
+            break;  // Stop when we pass the word
+        }
+    }
+
+
+
     return matches;
 }
-
-
 
 void show_occurrences(const std::vector<int> &positions, std::ifstream &text_file, const std::string &word, int context_size = 30) {
     std::cout << "Found " << positions.size() << " instances of the word \"" << word << "\":\n";
@@ -170,15 +198,19 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: Cannot open files.\n";
         return 1;
     }
+    std::ifstream index_file("index.txt");
+    if (!index_file) {
+        std::cerr << "Error opening index file!" << std::endl;
+        return 1;
+    }
 
-    std::vector<int> index_table(27000, -1);
-    create_index(index_table, index_stream);
+    //create_index(index_file, index_stream);
 
     std::string search_lower = to_lowercase(search_word);
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    std::vector<int> result_positions = find_word_positions(index_table, index_stream, search_lower);
+    std::vector<int> result_positions = find_word_positions(index_file, index_stream, search_lower);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    std::cout<<"Time taken to search: "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()<<" s"<<std::endl;
+    std::cout<<"Total time taken to find all matches: "<<std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count()<<" ms"<<std::endl;
 
     if (result_positions.empty()) {
         std::cout << "No matches found for the word: " << search_word << std::endl;
@@ -188,6 +220,7 @@ int main(int argc, char *argv[]) {
 
     text_stream.close();
     index_stream.close();
+    index_file.close();
 
     return 0;
 }
@@ -200,8 +233,8 @@ int main(int argc, char *argv[]) {
     std::getline(std::cin, search_word);
 
     // Load necessary files
-    std::ifstream text_stream("korpus");
-    std::ifstream index_stream("rawindex.txt");
+    std::ifstream text_stream("/afs/kth.se/misc/info/kurser/DD2350/adk24/labb1/korpus");
+    std::ifstream index_stream("/afs/kth.se/misc/info/kurser/DD2350/adk24/labb1/rawindex.txt");
 
     if (!text_stream || !index_stream) {
         std::cerr << "Error: Cannot open files.\n";
@@ -225,4 +258,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }*/
-
